@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackboard Mono Editor</title>
+    <link href="https://fonts.googleapis.com" rel="stylesheet">
+    <style>
+        :root { --bg: #121212; --text: #e0e0e0; --fade: #555; --border: #2a2a2a; --sidebar-bg: #1a1a1a; }
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); font-family: 'JetBrains Mono', monospace; color: var(--text); overflow: hidden; }
+        
+        #sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 250px; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 30px 20px; display: none; z-index: 100; transition: 0.3s; }
+        .page-link { display: flex; justify-content: space-between; margin-bottom: 15px; cursor: pointer; color: #888; font-size: 0.9rem; padding: 5px; border-radius: 4px; }
+        .page-link:hover { background: #252525; color: #fff; }
+        .page-link.active { color: #fff; background: #333; font-weight: bold; }
+
+        #container { height: 100vh; overflow-y: auto; padding: 60px 20px; box-sizing: border-box; display: flex; justify-content: center; }
+        #editor { width: 100%; max-width: 800px; outline: none; font-size: 18px; line-height: 1.8; min-height: 90vh; white-space: pre-wrap; word-wrap: break-word; }
+
+        .controls { position: fixed; bottom: 30px; right: 30px; display: flex; gap: 10px; z-index: 200; }
+        button { background: #222; border: 1px solid #444; padding: 10px 15px; cursor: pointer; color: #ccc; border-radius: 5px; font-family: inherit; font-size: 0.8rem; }
+        button:hover { background: #333; color: #fff; }
+
+        #stats { position: fixed; bottom: 30px; left: 30px; color: var(--fade); font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <h3 style="font-size: 0.7rem; color: #444; text-transform: uppercase; letter-spacing: 2px;">Explorer</h3>
+    <div id="page-list"></div>
+    <button style="width: 100%; margin-top: 20px; border-style: dashed;" onclick="newPage()">+ New File</button>
+    <button style="width: 100%; margin-top: 10px; color: #a44;" onclick="clearAll()">Clear Everything</button>
+</div>
+
+<div id="container">
+    <div id="editor" contenteditable="true" spellcheck="false" autofocus></div>
+</div>
+
+<div id="stats"><span id="word-count">0</span> words</div>
+
+<div class="controls">
+    <button onclick="toggleSidebar()">Menu</button>
+    <button onclick="downloadFile()">Download .txt</button>
+</div>
+
+<script>
+    const editor = document.getElementById('editor');
+    const wordCount = document.getElementById('word-count');
+    
+    // Core Data
+    let pages = JSON.parse(localStorage.getItem('notes_db')) || { "Untitled": "Welcome to your editor..." };
+    let currentKey = localStorage.getItem('active_note_key') || "Untitled";
+
+    function init() {
+        if (!pages[currentKey]) currentKey = Object.keys(pages)[0];
+        editor.innerText = pages[currentKey];
+        updateUI();
+    }
+
+    // SAVING LOGIC
+    editor.addEventListener('input', () => {
+        pages[currentKey] = editor.innerText;
+        localStorage.setItem('notes_db', JSON.stringify(pages));
+        updateStats();
+    });
+
+    function loadPage(key) {
+        currentKey = key;
+        editor.innerText = pages[key];
+        localStorage.setItem('active_note_key', key);
+        updateUI();
+        toggleSidebar(); 
+    }
+
+    function newPage() {
+        const name = prompt("Name your new file:");
+        if (name && !pages[name]) {
+            pages[name] = "";
+            loadPage(name);
+        }
+    }
+
+    function clearAll() {
+        if(confirm("Delete ALL your notes? This cannot be undone.")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    function updateUI() {
+        const list = document.getElementById('page-list');
+        list.innerHTML = Object.keys(pages).map(k => `
+            <div class="page-link ${k === currentKey ? 'active' : ''}" onclick="loadPage('${k}')">
+                <span>${k}</span>
+                <span onclick="event.stopPropagation(); deletePage('${k}')">✕</span>
+            </div>
+        `).join('');
+        updateStats();
+    }
+
+    function deletePage(key) {
+        if (Object.keys(pages).length <= 1) return alert("Must keep one file.");
+        delete pages[key];
+        localStorage.setItem('notes_db', JSON.stringify(pages));
+        loadPage(Object.keys(pages)[0]);
+    }
+
+    function updateStats() {
+        const text = editor.innerText.trim();
+        wordCount.innerText = text ? text.split(/\s+/).length : 0;
+    }
+
+    function downloadFile() {
+        const blob = new Blob([editor.innerText], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = `${currentKey}.txt`; a.click();
+    }
+
+    function toggleSidebar() {
+        const sb = document.getElementById('sidebar');
+        sb.style.display = (sb.style.display === 'block') ? 'none' : 'block';
+    }
+
+    init();
+</script>
+</body>
+</html>
